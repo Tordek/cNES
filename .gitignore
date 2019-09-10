@@ -53,3 +53,9 @@ dkms.conf
 
 # Roms
 *.nes
+
+# Libraries
+SDL2/
+
+# VIM
+*.swp
