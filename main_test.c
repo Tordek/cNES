@@ -4,38 +4,11 @@
 #include <stdint.h>
 
 #include "SDL2/SDL.h"
-#include "bus.h"
+#include "apu.h"
 #include "ic_6502.h"
 #include "ic_2c02.h"
 #include "nes_header.h"
-
-extern int8_t vram[];
-
-uint8_t cpu_ram[0x0800] = {0};
-
-uint8_t cpu_ram_read(void *ram, uint16_t address)
-{
-    uint8_t *_ram = (uint8_t *)ram;
-    return _ram[address & 0x7FF];
-}
-void cpu_ram_write(void *ram, uint16_t address, uint8_t data)
-{
-    uint8_t *_ram = (uint8_t *)ram;
-    _ram[address & 0x7FF] = data;
-}
-
-uint8_t prg_ram[0xC000] = {0};
-
-uint8_t prg_ram_read(void *ram, uint16_t address)
-{
-    uint8_t *_ram = (uint8_t *)ram;
-    return _ram[address & 0x3FFF];
-}
-void prg_ram_write(void *ram, uint16_t address, uint8_t data)
-{
-    uint8_t *_ram = (uint8_t *)ram;
-    _ram[address & 0x3FFF] = data;
-}
+#include "mapper.h"
 
 int const is_illegal[256] = {
     0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1,
@@ -75,12 +48,12 @@ char const names[256][4] = {
     "BEQ", "SBC", "KIL", "ISB", "NOP", "SBC", "INC", "ISB", "SED", "SBC", "NOP", "ISB", "NOP", "SBC", "INC", "ISB",
 };
 
-void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic_2C02_registers *ppu, struct bus *bus);
+void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic_2C02_registers *ppu, struct mapper *mapper);
 
-void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic_2C02_registers *ppu, struct bus *bus)
+void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic_2C02_registers *ppu, struct mapper *mapper)
 {
     printf("%04X ", cpu->program_counter);
-    uint8_t opcode = bus_read(bus, cpu->program_counter);
+    uint8_t opcode = mapper->cpu_bus_read(mapper, cpu->program_counter);
 
     switch(opcode) {
         case 0x00: case 0x08: case 0x18: case 0x1a: case 0x28: case 0x38: case 0x3a: case 0x40:
@@ -109,7 +82,7 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0xc0: case 0xc9: case 0xcb: case 0xd2: case 0xe0: case 0xe9: case 0xeb: case 0xf2:
             {
                 // IMM
-                uint8_t ad = bus_read(bus, cpu->program_counter + 1);
+                uint8_t ad = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
                 printf(" %02X %02X    ", opcode, ad);
 
                 printf("%c%s #$%02X                        ", is_illegal[opcode] ? '*' : ' ', names[opcode], ad);
@@ -122,10 +95,10 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0xc4: case 0xc5: case 0xc6: case 0xc7: case 0xe4: case 0xe5: case 0xe6: case 0xe7:
             {
                 // ZP0
-                uint8_t ad = bus_read(bus, cpu->program_counter + 1);
+                uint8_t ad = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
                 printf(" %02X %02X    ", opcode, ad);
 
-                uint8_t val = bus_read(bus, ad);
+                uint8_t val = mapper->cpu_bus_read(mapper, ad);
                 printf("%c%s $%02X = %02X                    ", is_illegal[opcode] ? '*' : ' ', names[opcode], ad, val);
             }
             break;
@@ -136,10 +109,10 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0xf4: case 0xf5: case 0xf6: case 0xf7:
             {
                 // ZPX
-                uint8_t ad = bus_read(bus, cpu->program_counter + 1);
+                uint8_t ad = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
                 printf(" %02X %02X    ", opcode, ad);
 
-                uint8_t data = bus_read(bus, ad + cpu->x & 0xFF);
+                uint8_t data = mapper->cpu_bus_read(mapper, ad + cpu->x & 0xFF);
                 printf("%c%s $%02X,X @ %02X = %02X             ", is_illegal[opcode] ? '*' : ' ', names[opcode], ad, ad + cpu->x & 0xFF, data);
             }
             break;
@@ -147,10 +120,10 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0x96: case 0x97: case 0xb6: case 0xb7:
             {
                 // ZPY
-                uint8_t ad = bus_read(bus, cpu->program_counter + 1);
+                uint8_t ad = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
                 printf(" %02X %02X    ", opcode, ad);
 
-                uint8_t data = bus_read(bus, ad + cpu->y & 0xFF);
+                uint8_t data = mapper->cpu_bus_read(mapper, ad + cpu->y & 0xFF);
                 printf("%c%s $%02X,Y @ %02X = %02X             ", is_illegal[opcode] ? '*' : ' ', names[opcode], ad, ad + cpu->y & 0xFF, data);
             }
             break;
@@ -158,7 +131,7 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0x10: case 0x30: case 0x50: case 0x70: case 0x90: case 0xb0: case 0xd0: case 0xf0:
             {
                 // REL
-                int8_t addr_rel = bus_read(bus, cpu->program_counter + 1);
+                int8_t addr_rel = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
                 printf(" %02X %02X    ", opcode, addr_rel & 0xFF);
                 printf("%c%s $%04X                       ", is_illegal[opcode] ? '*' : ' ', names[opcode], cpu->program_counter + addr_rel + 2);
             }
@@ -167,8 +140,8 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0x20: case 0x4c:
             {
                 // ABS
-                uint16_t lo = bus_read(bus, cpu->program_counter + 1);
-                uint16_t hi = bus_read(bus, cpu->program_counter + 2);
+                uint16_t lo = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
+                uint16_t hi = mapper->cpu_bus_read(mapper, cpu->program_counter + 2);
                 printf(" %02X %02X %02X ", opcode, lo, hi);
 
                 printf("%c%s $%04X                       ", is_illegal[opcode] ? '*' : ' ', names[opcode],  hi << 8 | lo);
@@ -181,11 +154,11 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0xef:
             {
                 // ABS (not jumps)
-                uint16_t lo = bus_read(bus, cpu->program_counter + 1);
-                uint16_t hi = bus_read(bus, cpu->program_counter + 2);
+                uint16_t lo = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
+                uint16_t hi = mapper->cpu_bus_read(mapper, cpu->program_counter + 2);
                 printf(" %02X %02X %02X ", opcode, lo, hi);
 
-                uint8_t val = bus_read(bus, hi << 8 | lo);
+                uint8_t val = mapper->cpu_bus_read(mapper, hi << 8 | lo);
 
                 printf("%c%s $%04X = %02X                  ", is_illegal[opcode] ? '*' : ' ', names[opcode],  hi << 8 | lo, val);
             }
@@ -197,13 +170,13 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0xfc: case 0xfd: case 0xfe: case 0xff:
             {
                 // ABX
-                uint8_t lo = bus_read(bus, cpu->program_counter + 1);
-                uint8_t hi = bus_read(bus, cpu->program_counter + 2);
+                uint8_t lo = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
+                uint8_t hi = mapper->cpu_bus_read(mapper, cpu->program_counter + 2);
                 printf(" %02X %02X %02X ", opcode, lo, hi);
 
                 uint16_t base = hi << 8 | lo;
                 uint16_t addr = base + cpu->x;
-                uint8_t data = bus_read(bus, addr);
+                uint8_t data = mapper->cpu_bus_read(mapper, addr);
 
                 printf("%c%s $%04X,X @ %04X = %02X         ", is_illegal[opcode] ? '*' : ' ', names[opcode], base, addr, data);
             }
@@ -214,14 +187,14 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0xd9: case 0xdb: case 0xf9: case 0xfb:
             {
                 // ABY
-                uint8_t lo = bus_read(bus, cpu->program_counter + 1);
-                uint8_t hi = bus_read(bus, cpu->program_counter + 2);
+                uint8_t lo = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
+                uint8_t hi = mapper->cpu_bus_read(mapper, cpu->program_counter + 2);
                 printf(" %02X %02X %02X ", opcode, lo, hi);
 
                 uint16_t base = hi << 8 | lo;
                 uint16_t addr = base + cpu->y;
 
-                uint8_t data = bus_read(bus, addr);
+                uint8_t data = mapper->cpu_bus_read(mapper, addr);
 
                 printf("%c%s $%04X,Y @ %04X = %02X         ", is_illegal[opcode] ? '*' : ' ', names[opcode], base, addr, data);
             }
@@ -230,15 +203,15 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0x6c:
             {
                 // IND (Handles page boundary bug)
-                uint8_t lo = bus_read(bus, cpu->program_counter + 1);
-                uint8_t hi = bus_read(bus, cpu->program_counter + 2);
+                uint8_t lo = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
+                uint8_t hi = mapper->cpu_bus_read(mapper, cpu->program_counter + 2);
                 printf(" %02X %02X %02X ", opcode, lo, hi);
 
                 uint16_t addr = hi << 8 | lo;
 
-                uint16_t val = bus_read(bus, hi << 8 | lo);
+                uint16_t val = mapper->cpu_bus_read(mapper, hi << 8 | lo);
                 lo++;
-                val |= bus_read(bus, hi << 8 | lo) << 8;
+                val |= mapper->cpu_bus_read(mapper, hi << 8 | lo) << 8;
 
                 printf("%c%s ($%04X) = %04X              ", is_illegal[opcode] ? '*' : ' ', names[opcode],  addr, val);
             }
@@ -249,14 +222,14 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0x81: case 0x83: case 0xa1: case 0xa3: case 0xc1: case 0xc3: case 0xe1: case 0xe3:
             {
                 // IZX
-                uint8_t ad = bus_read(bus, cpu->program_counter + 1);
+                uint8_t ad = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
                 printf(" %02X %02X    ", opcode, ad);
 
                 uint8_t base = ad + cpu->x;
-                uint16_t addr = bus_read(bus, base);
-                addr |= bus_read(bus, (base + 1) & 0xFF) << 8;
+                uint16_t addr = mapper->cpu_bus_read(mapper, base);
+                addr |= mapper->cpu_bus_read(mapper, (base + 1) & 0xFF) << 8;
 
-                uint8_t val = bus_read(bus, addr);
+                uint8_t val = mapper->cpu_bus_read(mapper, addr);
                 printf("%c%s ($%02X,X) @ %02X = %04X = %02X    ", is_illegal[opcode] ? '*' : ' ', names[opcode], ad, base, addr, val);
             }
 
@@ -266,15 +239,15 @@ void print_status(int32_t total_cycles, struct ic_6502_registers *cpu, struct ic
         case 0x91: case 0x93: case 0xb1: case 0xb3: case 0xd1: case 0xd3: case 0xf1: case 0xf3:
             {
                 // IZY
-                uint8_t ad = bus_read(bus, cpu->program_counter + 1);
+                uint8_t ad = mapper->cpu_bus_read(mapper, cpu->program_counter + 1);
                 printf(" %02X %02X    ", opcode, ad);
 
-                uint16_t base = bus_read(bus, ad);
-                base |= bus_read(bus, (ad + 1) & 0xFF) << 8;
+                uint16_t base = mapper->cpu_bus_read(mapper, ad);
+                base |= mapper->cpu_bus_read(mapper, (ad + 1) & 0xFF) << 8;
 
                 uint16_t addr = base + cpu->y;
 
-                uint8_t val = bus_read(bus, addr);
+                uint8_t val = mapper->cpu_bus_read(mapper, addr);
                 printf("%c%s ($%02X),Y = %04X @ %04X = %02X  ", is_illegal[opcode] ? '*' : ' ', names[opcode], ad, base, addr, val);
             }
 
@@ -303,51 +276,23 @@ int main(int argc, char *argv[])
         return rc;
     }
 
-    struct bus main_bus;
+    printf("ROM info: %s\n", argv[1]);
+    printf("Mapper: %d\n", rom.mapper_id);
+
     struct ic_6502_registers cpu;
     struct ic_2C02_registers ppu;
+    struct apu apu;
 
-    struct device ppu_device = {
-        .start = 0x2000,
-        .end = 0x2007,
-        .device = &ppu,
-        .read = ic_2c02_read,
-        .write = ic_2c02_write,
-    };
+    struct mapper *mapper = (mappers[rom.mapper_id])(&rom);
+    mapper->cpu = &cpu;
+    mapper->ppu = &ppu;
+    mapper->apu = &apu;
+    cpu.mapper = mapper;
+    ppu.mapper = mapper;
 
-    struct device ram_device = {
-        .start = 0x0000,
-        .end = 0x1FFF,
-        .device = cpu_ram,
-        .read = cpu_ram_read,
-        .write = cpu_ram_write,
-    };
+    ic_2c02_reset(&ppu);
+    ic_6502_reset(&cpu);
 
-    struct device prg_rom_device = {
-        .start = 0x8000,
-        .end = 0xFFFF,
-        .device = prg_ram,
-        .read = prg_ram_read,
-        .write = prg_ram_write,
-    };
-
-    register_device(ppu_device);
-    register_device(ram_device);
-    register_device(prg_rom_device);
-
-
-    FILE *rom_file = fopen(argv[1], "rb");
-    fseek(rom_file, 16, SEEK_SET);
-    for (int i = 0; i < 0x4000 * rom.prg_rom_size; i++) {
-        uint8_t c = fgetc(rom_file);
-        prg_ram[i] = c;
-    }
-    for (int i = 0; i < 0x2000 * rom.chr_rom_size; i++) {
-        uint8_t c = fgetc(rom_file);
-        vram[i] = c;
-    }
-
-    ic_6502_reset(&cpu, &main_bus);
     ppu.clock=-24;
 
     cpu.program_counter = 0xC000;
@@ -357,10 +302,10 @@ int main(int argc, char *argv[])
     while (count--) {
         do {
             ppu.clock+=3;
-            ic_6502_clock(&cpu, &main_bus);
+            ic_6502_clock(&cpu);
             total_cycles += 1;
         } while(cpu.cycles > 0);
-        print_status(total_cycles - 1, &cpu, &ppu, &main_bus);
+        print_status(total_cycles - 1, &cpu, &ppu, mapper);
     }
 
     return 0;

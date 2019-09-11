@@ -29,10 +29,10 @@ main_test.o : ic_6502.o ic_2c02.o nes_header.o mappers.o apu.o
 
 main_sdl.o : ic_6502.o ic_2c02.o nes_header.o mappers.o apu.o
 
-ic_6502.o : bus.o
+ic_6502.o : mappers.o
 
-ic_2c02.o : bus.o
+ic_2c02.o : mappers.o
 
-test.exe : ic_6502.o ic_2c02.o bus.o main_test.o nes_header.o ram.o
+test.exe : ic_6502.o ic_2c02.o main_test.o nes_header.o apu.o mappers.o
 	clang $(LIBRARY_PATHS) $(LINKER_FLAGS) $^ -o $@
 
