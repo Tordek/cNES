@@ -15,6 +15,7 @@ struct mapper_0 {
     uint8_t vram[0x2000];
     uint8_t work_ram[0x8000];
     uint16_t nametable_mirroring;
+    uint16_t prg_rom_mirroring;
     uint8_t *prg_rom;
     uint8_t *chr_rom;
 };
@@ -32,7 +33,7 @@ uint8_t mapper_0_cpu_bus_read(void *mapper_, uint16_t address)
     } else if (address < 0x8000) {
         return mapper->work_ram[address - 0x4020];
     } else {
-        return mapper->prg_rom[address & 0x3FFF];
+        return mapper->prg_rom[address & mapper->prg_rom_mirroring];
     }
 }
 
@@ -90,6 +91,11 @@ struct mapper *mapper_0_builder(struct nes_rom *rom)
     mapper->base.cpu_bus_write = mapper_0_cpu_bus_write;
     mapper->chr_rom = rom->chr_rom;
     mapper->prg_rom = rom->prg_rom;
+    if (rom->prg_rom_size == 1) {
+        mapper->prg_rom_mirroring = 0x3fff;
+    } else {
+        mapper->prg_rom_mirroring = 0x7fff;
+    }
     mapper->nametable_mirroring = rom->mirroring ? 0x17FF : 0x0FFF;
 
     return (struct mapper *)mapper;
