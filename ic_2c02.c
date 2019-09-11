@@ -78,13 +78,13 @@ void ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface)
 
                     // Shift 2 bits now to save 8 later when drawing the pixel
                     if ((chr_x & 0x02) && (chr_y & 0x02)) {
-                        ppu->palette = (ppu->attribute_byte & 0x03) << 2;
-                    } else if ((chr_x & 0x02) == 0 && (chr_y & 0x02)) {
-                        ppu->palette = (ppu->attribute_byte & 0x0C);
-                    } else if ((chr_x & 0x02) && (chr_y & 0x02) == 0) {
                         ppu->palette = (ppu->attribute_byte & 0x30) >> 2;
-                    } else {
+                    } else if ((chr_x & 0x02) == 0 && (chr_y & 0x02)) {
                         ppu->palette = (ppu->attribute_byte & 0xC0) >> 4;
+                    } else if ((chr_x & 0x02) && (chr_y & 0x02) == 0) {
+                        ppu->palette = (ppu->attribute_byte & 0x03) << 2;
+                    } else {
+                        ppu->palette = (ppu->attribute_byte & 0x0C);
                     }
 
                     ppu->pattern_lo |= ppu->pattern_lo_next;
@@ -112,6 +112,7 @@ uint8_t ic_2c02_read(void *device, uint16_t address)
             uint8_t status = ppu->status;
             ppu->status &= 0x7F;
             ppu->addr_latch = 1;
+            ppu->scroll_v = 0;
             return status;
         case 0x2007:
             uint8_t result = ppu->mapper->ppu_bus_read(ppu->mapper, ppu->vram_address);
