@@ -269,8 +269,14 @@ uint8_t ic_2c02_read(struct ic_2C02_registers *device, uint16_t address)
             ppu->w = 0;
             return status;
         case 0x0007:
-            uint8_t result = ppu->ppudata_read;
-            ppu->ppudata_read = ppu->mapper->ppu_bus_read(ppu->mapper, ppu->vram_address & 0x3FFF);
+            uint8_t result;
+            if (ppu->vram_address > 0x3F00) {
+                result = ppu->mapper->ppu_bus_read(ppu->mapper, ppu->vram_address);
+                ppu->ppudata_read = ppu->mapper->ppu_bus_read(ppu->mapper, ppu->vram_address & 0x2FFF);
+            } else {
+                result = ppu->ppudata_read;
+                ppu->ppudata_read = ppu->mapper->ppu_bus_read(ppu->mapper, ppu->vram_address & 0x3FFF);
+            }
             if (ppu->enable && ppu->scanline < 240) {
                 inc_x(ppu);
                 inc_y(ppu);

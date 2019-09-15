@@ -1,4 +1,6 @@
-struct apu {};
+struct apu {
+    int no;
+};
 
 uint8_t apu_read(struct apu *apu, uint16_t address);
 

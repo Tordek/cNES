@@ -59,3 +59,8 @@ SDL2/
 
 # VIM
 *.swp
+
+*.ttf
+*.profraw
+lib/
+*.log
