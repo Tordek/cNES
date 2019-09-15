@@ -6,6 +6,9 @@
 #include "nes_header.h"
 #include "mapper.h"
 #include "mappers.h"
+
+#include "controllers.h"
+#include "apu.h"
 #include "ic_6502.h"
 #include "ic_2c02.h"
 struct mapper_0 {
@@ -28,6 +31,7 @@ uint8_t mapper_0_cpu_bus_read(struct mapper *mapper_, uint16_t address)
         return mapper->main_ram[address & 0x07ff];
     } else if (address < 0x4000) {
         return ic_2c02_read(mapper->base.ppu, address & 0x0007);
+    } else if (address == 0x4016 || address == 0x4017) {
         return controllers_read(mapper->base.controllers, address & 0x0001);
     } else if (address < 0x4020) {
         return apu_read(mapper->base.apu, address & 0x401f);
@@ -49,6 +53,7 @@ void mapper_0_cpu_bus_write(struct mapper *mapper_, uint16_t address, uint8_t da
     } else if (address == 0x4014) {
         mapper->base.dma_page = data << 8;
         mapper->base.dma_write_time = 513 + (mapper->base.cpu->cycles & 0x01);
+    } else if (address == 0x4016 || address == 0x4017) {
         controllers_write(mapper->base.controllers, address & 0x0001, data);
     } else if (address < 0x4020) {
         apu_write(mapper->base.apu, address & 0x401f, data);

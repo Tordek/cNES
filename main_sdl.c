@@ -2,12 +2,14 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_ttf.h"
 
 #include "nes_header.h"
 #include "apu.h"
+#include "controllers.h"
 #include "mapper.h"
 #include "mappers.h"
 #include "ic_6502.h"
@@ -42,9 +44,12 @@ int main(int argc, char *argv[])
     struct ic_6502_registers cpu;
     struct ic_2C02_registers ppu;
     struct apu apu;
+    struct controllers controllers;
     mapper->cpu = &cpu;
     mapper->ppu = &ppu;
     mapper->apu = &apu;
+    mapper->controllers = &controllers;
+    memset(&controllers, 0, sizeof(struct controllers));
     cpu.mapper = mapper;
     ppu.mapper = mapper;
 
@@ -70,37 +75,41 @@ int main(int argc, char *argv[])
     uint32_t prev_ticks = 0;
     //int max_cycles = 1000000;
     while (1) {
-        do {
-            int render = mapper_clock(mapper, s);
+        int render = mapper_clock(mapper, s);
 
-            if (render) {
-                SDL_UpdateWindowSurface(w);
-                SDL_Event event;
-                while (SDL_PollEvent(&event));
-                SDL_FillRect( s, NULL, SDL_MapRGB( s->format, 0x00, 0x00, 0x00 ) );
-
-                debug_draw(mapper, s);
-
-                uint32_t total_ticks = 0;
-                for (int i = 0; i < 10; i++) {
-                    total_ticks += ticks[i];
-                }
-                ticks[counter] = SDL_GetTicks() - prev_ticks;
-                prev_ticks = SDL_GetTicks();
-                char fps_string[10];
-                sprintf(fps_string, "%4.0f FPS", 10000.0f / total_ticks);
-
-                textSurface = TTF_RenderText_Solid( font, fps_string, fg);
-
-                SDL_BlitSurface(textSurface, NULL, s, &textLocation);
-                SDL_FreeSurface(textSurface);
-
-                if (counter-- == 0) {
-                    counter = 9;
-                }
-                //SDL_Delay(13);
+        if (render) {
+            SDL_UpdateWindowSurface(w);
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                controllers_handle(&controllers, &event);
             }
-        } while(cpu.cycles > 0);
+            SDL_FillRect( s, NULL, SDL_MapRGB( s->format, 0x00, 0x00, 0x00 ) );
+
+            debug_draw(mapper, s);
+
+            uint32_t total_ticks = 0;
+            for (int i = 0; i < 10; i++) {
+                total_ticks += ticks[i];
+            }
+            ticks[counter] = SDL_GetTicks() - prev_ticks;
+            prev_ticks = SDL_GetTicks();
+            char fps_string[10];
+            sprintf(fps_string, "%4.0f FPS", 1000.0f / (total_ticks / 10.0f));
+
+           // if (total_ticks < 166) {
+           //     SDL_Delay(16 - total_ticks / 10);
+           // }
+
+            textSurface = TTF_RenderText_Solid( font, fps_string, fg);
+
+            SDL_BlitSurface(textSurface, NULL, s, &textLocation);
+            SDL_FreeSurface(textSurface);
+
+            if (counter-- == 0) {
+                counter = 9;
+            }
+            //SDL_Delay(13);
+        }
     }
 
     return 0;
