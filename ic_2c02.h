@@ -17,7 +17,7 @@ struct ic_2C02_registers {
     int do_nmi;
 
     int clock;
-    uint8_t enable;
+    uint8_t mask;
 
     int pixel;
     int scanline;
@@ -30,7 +30,8 @@ struct ic_2C02_registers {
     int w; // Read latch
     uint16_t pattern_hi;
     uint16_t pattern_lo;
-    uint8_t palette;
+    uint8_t palette_hi;
+    uint8_t palette_lo;
     uint8_t palette_next;
     uint16_t background;
 
@@ -68,11 +69,12 @@ struct ic_2C02_registers {
     int waste;
 
     uint8_t ppudata_read;
+    uint8_t palette[0x20];
 
     struct mapper *mapper;
 };
 
-void ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface);
+int ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface);
 uint8_t ic_2c02_read(struct ic_2C02_registers *device, uint16_t address);
 void ic_2c02_write(struct ic_2C02_registers *device, uint16_t address, uint8_t value);
 void ic_2c02_reset(struct ic_2C02_registers *ppu);

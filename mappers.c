@@ -4,7 +4,6 @@
 #include "SDL2/SDL.h"
 
 #include "nes_header.h"
-#include "apu.h"
 #include "mapper.h"
 #include "mappers.h"
 #include "ic_6502.h"
@@ -29,6 +28,7 @@ uint8_t mapper_0_cpu_bus_read(struct mapper *mapper_, uint16_t address)
         return mapper->main_ram[address & 0x07ff];
     } else if (address < 0x4000) {
         return ic_2c02_read(mapper->base.ppu, address & 0x0007);
+        return controllers_read(mapper->base.controllers, address & 0x0001);
     } else if (address < 0x4020) {
         return apu_read(mapper->base.apu, address & 0x401f);
     } else if (address < 0x8000) {
@@ -49,6 +49,7 @@ void mapper_0_cpu_bus_write(struct mapper *mapper_, uint16_t address, uint8_t da
     } else if (address == 0x4014) {
         mapper->base.dma_page = data << 8;
         mapper->base.dma_write_time = 513 + (mapper->base.cpu->cycles & 0x01);
+        controllers_write(mapper->base.controllers, address & 0x0001, data);
     } else if (address < 0x4020) {
         apu_write(mapper->base.apu, address & 0x401f, data);
     } else if (address < 0x8000) {
@@ -64,12 +65,8 @@ uint8_t mapper_0_ppu_bus_read(struct mapper *mapper_, uint16_t address)
 
     if (address < 0x2000) {
         return mapper->chr_rom[address];
-    } else if (address < 0x3F00) {
-        return mapper->vram[address & mapper->nametable_mirroring];
-    } else if ((address & 0x0003) == 0x0000) {
-        return mapper->palette[address & 0x000F];
     } else {
-        return mapper->palette[address & 0x001F];
+        return mapper->vram[address & mapper->nametable_mirroring];
     }
 }
 
@@ -79,12 +76,8 @@ void mapper_0_ppu_bus_write(struct mapper *mapper_, uint16_t address, uint8_t da
 
     if (address < 0x2000) {
         // chr_rom is not writable; ignore.
-    } else if (address < 0x3F00) {
-        mapper->vram[address & mapper->nametable_mirroring] = data;
-    } else if ((address & 0x0003) == 0x0000) {
-        mapper->palette[address & 0x000F] = data;
     } else {
-        mapper->palette[address & 0x001F] = data;
+        mapper->vram[address & mapper->nametable_mirroring] = data;
     }
 }
 
@@ -93,19 +86,19 @@ struct mapper *mapper_0_builder(struct nes_rom *rom)
     struct mapper_0 *mapper;
 
     mapper = malloc(sizeof(struct mapper_0));
-    mapper->base.dma_write_time = 0;
-    mapper->base.ppu_bus_read = mapper_0_ppu_bus_read;
-    mapper->base.ppu_bus_write = mapper_0_ppu_bus_write;
-    mapper->base.cpu_bus_read = mapper_0_cpu_bus_read;
-    mapper->base.cpu_bus_write = mapper_0_cpu_bus_write;
-    mapper->chr_rom = rom->chr_rom;
-    mapper->prg_rom = rom->prg_rom;
-    if (rom->prg_rom_size == 1) {
-        mapper->prg_rom_mirroring = 0x3fff;
-    } else {
-        mapper->prg_rom_mirroring = 0x7fff;
-    }
-    mapper->nametable_mirroring = rom->mirroring ? 0x07FF : 0x0BFF;
+    *mapper = (struct mapper_0) {
+        .base = (struct mapper) {
+            .dma_write_time = 0,
+            .ppu_bus_read = mapper_0_ppu_bus_read,
+            .ppu_bus_write = mapper_0_ppu_bus_write,
+            .cpu_bus_read = mapper_0_cpu_bus_read,
+            .cpu_bus_write = mapper_0_cpu_bus_write,
+        },
+        .chr_rom = rom->chr_rom,
+        .prg_rom = rom->prg_rom,
+        .prg_rom_mirroring = rom->prg_rom_size == 1 ? 0x3fff : 0x7fff,
+        .nametable_mirroring = rom->mirroring ? 0x07FF : 0x0BFF,
+    };
 
     return (struct mapper *)mapper;
 }
@@ -114,14 +107,9 @@ int mapper_clock(struct mapper *mapper, SDL_Surface *s)
 {
     mapper->clock++;
 
-    ic_2C02_clock(mapper->ppu, s);
-
-    int render = 0;
-    if (mapper->ppu->scanline == 241 && mapper->ppu->pixel == 1) {
-        if (mapper->ppu->do_nmi) {
-            ic_6502_nmi(mapper->cpu);
-            render = 1;
-        }
+    int render = ic_2C02_clock(mapper->ppu, s);
+    if (render && mapper->ppu->do_nmi) {
+        ic_6502_nmi(mapper->cpu);
     }
 
     if (mapper->clock % 3 == 0) {

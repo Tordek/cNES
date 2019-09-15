@@ -48,7 +48,7 @@ void debug_draw(struct mapper *mapper, SDL_Surface *surface)
     // Palettes
     for (int i = 0; i < 8; i++) {       // Palette ID
         for (int j = 0; j < 4; j++) {   // Color
-            uint8_t color = mapper->ppu_bus_read(mapper, 0x3F00 | (i << 2) | j);
+            uint8_t color = mapper->ppu->palette[(i << 2) | j];
             SDL_Rect p = {
                 .x = i * 16 + 256 + 16,
                 .y = j * 16 + 16,
@@ -85,7 +85,7 @@ void debug_draw(struct mapper *mapper, SDL_Surface *surface)
                         color_id |= (pattern_hi & 0x80) >> 6;
 
                         // TODO: Can change palette.
-                        ((uint32_t *)surface->pixels)[(p_y * surface->w + p_x)] = palette_table[mapper->ppu_bus_read(mapper, 0x3f00 + color_id)];
+                        ((uint32_t *)surface->pixels)[(p_y * surface->w + p_x)] = palette_table[mapper->ppu->palette[color_id]];
 
                         pattern_hi <<= 1;
                         pattern_lo <<= 1;
@@ -149,7 +149,7 @@ void debug_draw(struct mapper *mapper, SDL_Surface *surface)
 
                             int color_abs = color_id ? palette | color_id : 0;
 
-                            ((uint32_t *)surface->pixels)[(p_y * surface->w + p_x)] = palette_table[mapper->ppu_bus_read(mapper, 0x3f00 | color_abs)];
+                            ((uint32_t *)surface->pixels)[(p_y * surface->w + p_x)] = palette_table[mapper->ppu->palette[color_abs]];
 
                             pattern_hi <<= 1;
                             pattern_lo <<= 1;
@@ -186,7 +186,7 @@ void debug_draw(struct mapper *mapper, SDL_Surface *surface)
                 color_id |= (sprite.attributes & 0x03) << 2;
                 color_id |= 0x10;
 
-                ((uint32_t *)surface->pixels)[(p_y * surface->w + p_x)] = palette_table[mapper->ppu_bus_read(mapper, 0x3f00 | color_id)];
+                ((uint32_t *)surface->pixels)[(p_y * surface->w + p_x)] = palette_table[mapper->ppu->palette[color_id]];
 
                 pattern_hi <<= 1;
                 pattern_lo <<= 1;
