@@ -3,6 +3,17 @@
 #include "SDL2/SDL.h"
 #include "controllers.h"
 
+void controllers_init(struct controllers *controllers)
+{
+    *controllers = (struct controllers) {
+        .p1_status = 0,
+        .p2_status = 0,
+        .p1_latch = 0,
+        .p1_strobe = 0,
+        .p2_strobe = 0,
+    };
+}
+
 uint8_t controllers_read(struct controllers *controllers, uint16_t address)
 {
     if (address == 0) {
