@@ -110,7 +110,7 @@ struct mapper *mapper_0_builder(struct nes_rom *rom)
 
 int mapper_clock(struct mapper *mapper, SDL_Surface *s)
 {
-    while ((mapper->apu->buffer_count + 1) % 2048 == mapper->apu->buffer_start);
+    while ((mapper->apu->buffer_tail + 1) % 2048 == mapper->apu->buffer_head);
     mapper->clock++;
 
     int render = ic_2C02_clock(mapper->ppu, s);

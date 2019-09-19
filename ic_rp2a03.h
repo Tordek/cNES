@@ -11,7 +11,7 @@ struct ic_rp2a03 {
     uint8_t pulse_1_length;
 
     uint16_t pulse_1_time;
-    float pulse_1_value;
+    uint8_t pulse_1_value;
 
     uint8_t pulse_2_duty;
     uint8_t pulse_2_envelope;
@@ -25,11 +25,11 @@ struct ic_rp2a03 {
     uint8_t pulse_2_length;
 
     uint16_t pulse_2_time;
-    float pulse_2_value;
+    uint8_t pulse_2_value;
 
     float buffer[4096];
-    volatile int buffer_start;
-    volatile int buffer_count;
+    volatile int buffer_head;
+    volatile int buffer_tail;
     int buffer_max;
     float clocks;
     float clk;

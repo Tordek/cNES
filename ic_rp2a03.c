@@ -37,8 +37,8 @@ void ic_rp2a03_init(struct ic_rp2a03 *apu)
         .pulse_2_time = 0,
         .pulse_2_value = 0,
 
-        .buffer_start = 0,
-        .buffer_count = 0,
+        .buffer_head = 0,
+        .buffer_tail = 0,
         .buffer_max = 0,
         .clocks = 0,
 
@@ -121,17 +121,18 @@ void ic_rp2a03_sdl_audio_callback(void *userdata, uint8_t *stream_raw, int len)
     int flen = len / sizeof(float);
     float *stream = (float *)stream_raw;
 
-    int length = apu_data->buffer_count - apu_data->buffer_start;
+    int length = apu_data->buffer_tail - apu_data->buffer_head;
     if (length < 0) length += 2048;
     if (length < flen) {
+        printf("EMPTY\n");
         for (int i = 0; i < flen; i++) {
             stream[i] = 0.0f;
         }
         return;
     }
     for (int i = 0; i < flen; i++) {
-        stream[i] = apu_data->buffer[apu_data->buffer_start];
-        apu_data->buffer_start = (apu_data->buffer_start + 1) % 2048;
+        stream[i] = apu_data->buffer[apu_data->buffer_head];
+        apu_data->buffer_head = (apu_data->buffer_head + 1) % 2048;
     }
 }
 
@@ -143,42 +144,43 @@ void ic_rp2a03_clock(struct ic_rp2a03 *apu)
         if (apu->pulse_1_time == 0) {
             apu->pulse_1_time = apu->pulse_1_timer;
 
-                if (apu->pulse_1_duty & 0x80) {
-                    apu->pulse_1_value = -0.01f;
-                } else {
-                    apu->pulse_1_value = 0.01f;
-                }
-            if (apu->pulse_1_length > 0) {
-                apu->pulse_1_duty = (apu->pulse_1_duty << 1) | (apu->pulse_1_duty >> 7);
-            }
+            apu->pulse_1_duty = (apu->pulse_1_duty << 1) | (apu->pulse_1_duty >> 7);
         } else {
             apu->pulse_1_time--;
         }
 
+        if (apu->pulse_1_length > 0) {
+            if (apu->pulse_1_duty & 0x80) {
+                apu->pulse_1_value = 15;
+            } else {
+                apu->pulse_1_value = 0;
+            }
+        }
+
         if (apu->pulse_2_time == 0) {
             apu->pulse_2_time = apu->pulse_2_timer;
-
-                if (apu->pulse_2_duty & 0x80) {
-                    apu->pulse_2_value = -0.01f;
-                } else {
-                    apu->pulse_2_value = 0.01f;
-                }
-            if (apu->pulse_2_length > 0) {
-                apu->pulse_2_duty = (apu->pulse_2_duty << 1) | (apu->pulse_2_duty >> 7);
-            }
+            apu->pulse_2_duty = (apu->pulse_2_duty << 1) | (apu->pulse_2_duty >> 7);
         } else {
             apu->pulse_2_time--;
+        }
+
+        if (apu->pulse_2_length > 0) {
+            if (apu->pulse_2_duty & 0x80) {
+                apu->pulse_2_value = 15;
+            } else {
+                apu->pulse_2_value = 0;
+            }
         }
     } else {
         apu->divider--;
     }
 
     if (apu->frame_divider == 0) {
-        apu->frame_divider = 140900;
+        apu->frame_divider = 140900 * 3;
 
-        if (apu->pulse_1_length > 0)
+        if (apu->pulse_1_length > 0 && !apu->pulse_1_envelope)
             apu->pulse_1_length--;
-        if (apu->pulse_2_length > 0)
+        if (apu->pulse_2_length > 0 && !apu->pulse_2_envelope)
             apu->pulse_2_length--;
     } else {
         apu->frame_divider--;
@@ -187,7 +189,7 @@ void ic_rp2a03_clock(struct ic_rp2a03 *apu)
     apu->clocks++;
     while (apu->clocks >= 0) {
         apu->clocks -= 1789773 / apu->sampling;
-        apu->buffer[apu->buffer_count] = apu->pulse_1_value + apu->pulse_2_value;
-        apu->buffer_count = (apu->buffer_count + 1) % 2048;
+        apu->buffer[apu->buffer_tail] = 9.588 / (8128.0 / (apu->pulse_1_value + apu->pulse_2_value) + 100);
+        apu->buffer_tail = (apu->buffer_tail + 1) % 2048;
     }
 }
