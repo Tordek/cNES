@@ -37,6 +37,10 @@ struct ic_rp2a03 {
     float sampling;
     int divider;
     int frame_divider;
+
+    SDL_bool buffer_fool;
+    SDL_cond *buffer_full_cond;
+    SDL_mutex *buffer_full_lock;
 };
 
 uint8_t ic_rp2a03_read(struct ic_rp2a03 *apu, uint16_t address);

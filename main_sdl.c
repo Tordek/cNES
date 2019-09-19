@@ -79,7 +79,6 @@ int main(int argc, char *argv[])
     }
 
     apu.sampling = obtained.freq;
-    apu.buffer_max = 1024;
     SDL_PauseAudioDevice(audio, 0);
 
     SDL_Surface *s = SDL_GetWindowSurface(w);
