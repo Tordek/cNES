@@ -30,14 +30,27 @@ int read_rom(struct nes_rom *rom, char *filename)
     rom->non_volatile_memory = header_data[6] & 0x02;
     rom->trainer = header_data[6] & 0x04;
     rom->four_screen_mode = header_data[6] & 0x08;
-
     rom->mapper_id = header_data[6] >> 4;
-    rom->mapper_id |= header_data[6] & 0xF0;
-    rom->mapper_id |= (header_data[8] & 0x0F) << 8;
-    rom->submapper_id = header_data[8] >> 4;
 
-    rom->prg_rom_size |= (header_data[9] & 0x0F) << 8;
-    rom->chr_rom_size |= (header_data[9] & 0xF0) << 4;
+    rom->mapper_id |= header_data[7] & 0xF0;
+
+    if ((header_data[7] & 0x0C) == 0x08) {
+        printf("NES 2.0\n");
+        rom->mapper_id |= (header_data[8] & 0x0F) << 8;
+        rom->submapper_id = header_data[8] >> 4;
+
+        rom->prg_rom_size |= (header_data[9] & 0x0F) << 8;
+        rom->chr_rom_size |= (header_data[9] & 0xF0) << 4;
+        printf("%s\n", (header_data[10] & 0x02) == 2 ? "PAL"
+                     : (header_data[10] & 0x02) == 0 ? "NTSC"
+                     : "Either");
+    } else if ((header_data[7] & 0x0C) == 0 && header_data[12] == 0 && header_data[12] == 0 && header_data[12] == 0 && header_data[12] == 0) {
+        printf("iNES\n");
+        printf("%s\n", header_data[9] & 0x01 ? "PAL": "NTSC");
+    } else {
+        printf("iNES Archaic\n");
+    }
+
 
     rom->prg_rom = malloc(0x4000 * rom->prg_rom_size);
     fread(rom->prg_rom, 0x4000, rom->prg_rom_size, rom_file);
