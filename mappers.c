@@ -8,7 +8,7 @@
 #include "mappers.h"
 
 #include "controllers.h"
-#include "apu.h"
+#include "ic_rp2a03.h"
 #include "ic_6502.h"
 #include "ic_2c02.h"
 struct mapper_0 {
@@ -34,7 +34,7 @@ uint8_t mapper_0_cpu_bus_read(struct mapper *mapper_, uint16_t address)
     } else if (address == 0x4016 || address == 0x4017) {
         return controllers_read(mapper->base.controllers, address & 0x0001);
     } else if (address < 0x4020) {
-        return apu_read(mapper->base.apu, address & 0x401f);
+        return ic_rp2a03_read(mapper->base.apu, address & 0x001f);
     } else if (address < 0x8000) {
         return mapper->work_ram[address - 0x4020];
     } else {
@@ -56,7 +56,7 @@ void mapper_0_cpu_bus_write(struct mapper *mapper_, uint16_t address, uint8_t da
     } else if (address == 0x4016 || address == 0x4017) {
         controllers_write(mapper->base.controllers, address & 0x0001, data);
     } else if (address < 0x4020) {
-        apu_write(mapper->base.apu, address & 0x401f, data);
+        ic_rp2a03_write(mapper->base.apu, address & 0x001f, data);
     } else if (address < 0x8000) {
         mapper->work_ram[address - 0x4020] = data;
     } else {
@@ -110,14 +110,15 @@ struct mapper *mapper_0_builder(struct nes_rom *rom)
 
 int mapper_clock(struct mapper *mapper, SDL_Surface *s)
 {
-    mapper->clock++;
-
     int render = ic_2C02_clock(mapper->ppu, s);
     if (render && mapper->ppu->do_nmi) {
         ic_6502_nmi(mapper->cpu);
     }
 
-    if (mapper->clock % 3 == 0) {
+    if (mapper->clock == 0) {
+        mapper->clock = 2;
+
+        ic_rp2a03_clock(mapper->apu);
         if (mapper->dma_write_time > 512) {
             mapper->dma_write_time--;
         } else if (mapper->dma_write_time > 0) {
@@ -128,14 +129,15 @@ int mapper_clock(struct mapper *mapper, SDL_Surface *s)
                 mapper->cpu_bus_write(mapper, 0x2004, val);
             }
         } else {
-            mapper->clock = 0;
             ic_6502_clock(mapper->cpu);
         }
+    } else {
+        mapper->clock--;
     }
 
     return render;
 }
 
-struct mapper * (*mappers[])(struct nes_rom *rom) = {
+struct mapper *(*mappers[])(struct nes_rom *rom) = {
     mapper_0_builder,
 };

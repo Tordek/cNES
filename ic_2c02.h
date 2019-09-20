@@ -78,3 +78,4 @@ int ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface);
 uint8_t ic_2c02_read(struct ic_2C02_registers *device, uint16_t address);
 void ic_2c02_write(struct ic_2C02_registers *device, uint16_t address, uint8_t value);
 void ic_2c02_reset(struct ic_2C02_registers *ppu);
+void ic_2c02_init(struct ic_2C02_registers *ppu);

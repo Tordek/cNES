@@ -13,6 +13,66 @@ int32_t const palette_table[128] = {
 static void ic_2c02_inc_x(struct ic_2C02_registers *ppu);
 static void ic_2c02_inc_y(struct ic_2C02_registers *ppu);
 
+void ic_2c02_init(struct ic_2C02_registers *ppu)
+{
+    *ppu = (struct ic_2C02_registers) {
+        .status = 0,
+
+        .do_nmi = 0,
+
+        .clock = 0,
+        .mask = 0,
+
+        .pixel = 0,
+        .scanline = -1,
+
+        // Background registers
+        .vram_increment = 0,
+        .vram_address = 0,
+        .t = 0,
+        .fine_x = 0,
+        .w = 0, // Read latch
+        .pattern_hi = 0,
+        .pattern_lo = 0,
+        .palette_hi = 0,
+        .palette_lo = 0,
+        .palette_next = 0,
+        .background = 0,
+
+        .pattern_hi_next = 0,
+        .pattern_lo_next = 0,
+        .nametable_byte_next = 0,
+        .attribute_byte = 0,
+        .attribute_byte_next = 0,
+
+        // Sprites
+        .sprite_pattern_table = 0,
+        .primary_oam.raw = {0},
+        .secondary_oam.raw = {0},
+        .sprite_pattern_hi = {0},
+        .sprite_pattern_lo = {0},
+        .sprite_attributes = {0},
+        .sprite_id = {0},
+        .sprite_x = {0},
+        .secondary_oam_write_enable = 0,
+        .tall_sprites = 0,
+
+        .secondary_oam_index = 0,
+        .n = 0,
+
+        .oam_addr = 0,
+        .oam_state = 0,
+
+        .m = 0,
+        .waste = 0,
+
+        .ppudata_read = 0,
+        .palette = {0},
+
+        .mapper = NULL,
+    };
+}
+
 void ic_2c02_reset(struct ic_2C02_registers *ppu)
 {
     ppu->palette_next = 0;
@@ -20,9 +80,8 @@ void ic_2c02_reset(struct ic_2C02_registers *ppu)
     ppu->pattern_lo = 0;
     ppu->status = 0;
     ppu->vram_increment = 1;
-    ppu->clock = 0;
     ppu->pixel = 0;
-    ppu->scanline = 0;
+    ppu->scanline = -1;
 }
 
 int ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface)
@@ -159,7 +218,7 @@ int ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface)
     }
 
     // Sprite evaluation
-    if (pixel < 65) {
+    if (0 < pixel && pixel < 65) {
         ppu->secondary_oam.raw[pixel & 0x1f] = 0xFF;
         ppu->secondary_oam_index = 0;
         ppu->n = 0;
@@ -236,7 +295,6 @@ int ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface)
     } else if (pixel == 340) {
     }
 
-    ppu->clock++;
     ppu->pixel++;
 
     if (ppu->pixel > 340) {
@@ -251,7 +309,6 @@ int ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface)
     if (ppu->scanline == -1 && ppu->pixel == 1) {
         ppu->status &= 0x7f; // Exit VBlank
         ppu->status &= 0xbf;
-        ppu->clock = 0;
     }
 
     if (ppu->scanline == 241 && ppu->pixel == 1) {

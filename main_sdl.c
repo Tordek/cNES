@@ -8,7 +8,7 @@
 #include "SDL2/SDL_ttf.h"
 
 #include "nes_header.h"
-#include "apu.h"
+#include "ic_rp2a03.h"
 #include "controllers.h"
 #include "mapper.h"
 #include "mappers.h"
@@ -43,22 +43,43 @@ int main(int argc, char *argv[])
 
     struct ic_6502_registers cpu;
     struct ic_2C02_registers ppu;
-    struct apu apu;
+    struct ic_rp2a03 apu;
     struct controllers controllers;
+
+    ic_6502_init(&cpu);
+    ic_2c02_init(&ppu);
+    ic_rp2a03_init(&apu);
+    controllers_init(&controllers);
+    cpu.mapper = mapper;
+    ppu.mapper = mapper;
+
     mapper->cpu = &cpu;
     mapper->ppu = &ppu;
     mapper->apu = &apu;
     mapper->controllers = &controllers;
-    memset(&controllers, 0, sizeof(struct controllers));
-    cpu.mapper = mapper;
-    ppu.mapper = mapper;
 
-    ic_2c02_reset(&ppu);
-    ic_6502_reset(&cpu);
-
-    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
     TTF_Init();
     SDL_Window *w = SDL_CreateWindow("NES", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 740, SDL_WINDOW_SHOWN);
+    SDL_AudioSpec desired = {
+        .freq = 44100,
+        .format = AUDIO_F32,
+        .channels = 1,
+        .samples = 1024,
+        .callback = ic_rp2a03_sdl_audio_callback,
+        .userdata = &apu,
+    };
+
+    SDL_AudioSpec obtained;
+    SDL_AudioDeviceID audio = SDL_OpenAudioDevice(NULL, 0, &desired, &obtained, 0);
+
+    // TODO: Sanity checks
+    if (audio == 0) {
+        SDL_Log("Failed to open audio: %s", SDL_GetError());
+    }
+
+    apu.sampling = obtained.freq;
+    SDL_PauseAudioDevice(audio, 0);
 
     SDL_Surface *s = SDL_GetWindowSurface(w);
 
@@ -69,6 +90,9 @@ int main(int argc, char *argv[])
     SDL_Color fg = { 0xff, 0xff, 0xff, 0xff, };
 
     textLocation = (SDL_Rect){ .x = 2, .y = 256, .w = 0, .h = 0, };
+
+    ic_2c02_reset(&ppu);
+    ic_6502_reset(&cpu);
 
     uint32_t ticks[10] = {0};
     uint32_t counter = 10;
@@ -91,16 +115,13 @@ int main(int argc, char *argv[])
             for (int i = 0; i < 10; i++) {
                 total_ticks += ticks[i];
             }
-            ticks[counter] = SDL_GetTicks() - prev_ticks;
-            prev_ticks = SDL_GetTicks();
+            uint32_t nticks = SDL_GetTicks();
+            ticks[counter] = nticks - prev_ticks;
+            prev_ticks = nticks;
             char fps_string[10];
             sprintf(fps_string, "%4.0f FPS", 1000.0f / (total_ticks / 10.0f));
 
-           // if (total_ticks < 166) {
-           //     SDL_Delay(16 - total_ticks / 10);
-           // }
-
-            textSurface = TTF_RenderText_Solid( font, fps_string, fg);
+            textSurface = TTF_RenderText_Solid(font, fps_string, fg);
 
             SDL_BlitSurface(textSurface, NULL, s, &textLocation);
             SDL_FreeSurface(textSurface);
@@ -108,7 +129,6 @@ int main(int argc, char *argv[])
             if (counter-- == 0) {
                 counter = 9;
             }
-            //SDL_Delay(13);
         }
     }
 

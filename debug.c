@@ -3,10 +3,10 @@
 #include "SDL2/SDL_ttf.h"
 
 #include "nes_header.h"
-#include "apu.h"
 #include "mapper.h"
 #include "ic_6502.h"
 #include "ic_2c02.h"
+#include "ic_rp2a03.h"
 
 #include "debug.h"
 

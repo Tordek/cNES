@@ -38,6 +38,21 @@ uint8_t const ic_6502_op_cycles[] = {
     2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
 };
 
+void ic_6502_init(struct ic_6502_registers *cpu)
+{
+    *cpu = (struct ic_6502_registers) {
+        .program_counter = 0,
+        .status = 0,
+        .stack_pointer = 0,
+        .a = 0,
+        .x = 0,
+        .y = 0,
+
+        .cycles = 0,
+        .mapper = NULL,
+    };
+}
+
 inline void update_flag(struct ic_6502_registers * restrict registers, enum ic_6502_flags flag, int value)
 {
     if (value) {

@@ -14,3 +14,4 @@ extern uint8_t const ic_6502_op_length[];
 void ic_6502_reset(struct ic_6502_registers * restrict registers);
 void ic_6502_clock(struct ic_6502_registers * restrict registers);
 void ic_6502_nmi(struct ic_6502_registers * restrict registers);
+void ic_6502_init(struct ic_6502_registers *registers);
