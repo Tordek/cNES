@@ -38,6 +38,6 @@ ic_6502.o : mappers.o
 
 ic_2c02.o : mappers.o
 
-test.exe : ic_6502.o ic_2c02.o main_test.o nes_header.o ic_rp2a03.o mappers.o
+test.exe : ic_6502.o ic_2c02.o main_test.o nes_header.o ic_rp2a03.o mappers.o controllers.o
 	clang $(LIBRARY_PATHS) $(LINKER_FLAGS) $^ -o $@
 

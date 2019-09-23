@@ -12,3 +12,5 @@ struct mapper {
     int16_t dma_page;
     int16_t dma_write_time;
 };
+
+int mapper_clock(struct mapper *mapper);

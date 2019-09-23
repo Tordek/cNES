@@ -1,14 +1,6 @@
 #include <stdint.h>
-#include "SDL2/SDL.h"
 #include "mapper.h"
 #include "ic_2c02.h"
-
-int32_t const palette_table[128] = {
-    0xff7c7c7c, 0xff0000fc, 0xff0000bc, 0xff4428bc, 0xff940084, 0xffa80020, 0xffa81000, 0xff881400, 0xff503000, 0xff007800, 0xff006800, 0xff005800, 0xff004058, 0xff000000, 0xff000000, 0xff000000,
-    0xffbcbcbc, 0xff0078f8, 0xff0058f8, 0xff6844fc, 0xffd800cc, 0xffe40058, 0xfff83800, 0xffe45c10, 0xffac7c00, 0xff00b800, 0xff00a800, 0xff00a844, 0xff008888, 0xff000000, 0xff000000, 0xff000000,
-    0xfff8f8f8, 0xff3cbcfc, 0xff6888fc, 0xff9878f8, 0xfff878f8, 0xfff85898, 0xfff87858, 0xfffca044, 0xfff8b800, 0xffb8f818, 0xff58d854, 0xff58f898, 0xff00e8d8, 0xff787878, 0xff000000, 0xff000000,
-    0xfffcfcfc, 0xffa4e4fc, 0xffb8b8f8, 0xffd8b8f8, 0xfff8b8f8, 0xfff8a4c0, 0xfff0d0b0, 0xfffce0a8, 0xfff8d878, 0xffd8f878, 0xffb8f8b8, 0xffb8f8d8, 0xff00fcfc, 0xfff8d8f8, 0xff000000, 0xff000000,
-};
 
 static void ic_2c02_inc_x(struct ic_2C02_registers *ppu);
 static void ic_2c02_inc_y(struct ic_2C02_registers *ppu);
@@ -69,6 +61,7 @@ void ic_2c02_init(struct ic_2C02_registers *ppu)
         .ppudata_read = 0,
         .palette = {0},
 
+        .screen = {{0}},
         .mapper = NULL,
     };
 }
@@ -84,7 +77,7 @@ void ic_2c02_reset(struct ic_2C02_registers *ppu)
     ppu->scanline = -1;
 }
 
-int ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface)
+int ic_2C02_clock(struct ic_2C02_registers *ppu)
 {
     int scanline = ppu->scanline;
     int pixel = ppu->pixel;
@@ -134,12 +127,13 @@ int ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface)
                     }
                 }
             }
+
             uint8_t palette_color = ppu->palette[color_abs];
             if (ppu->mask & 0x01) {
                 palette_color &= 0x30;
             }
-            int32_t color = palette_table[palette_color];
-            ((uint32_t *)surface->pixels)[(scanline * surface->w + pixel - 1)] = color;
+
+            ppu->screen[scanline][pixel - 1] = palette_color;
         }
 
         if ((2 <= pixel && pixel <= 257) || (322 <= pixel && pixel <= 337)) {

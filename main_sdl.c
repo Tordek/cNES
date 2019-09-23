@@ -17,7 +17,14 @@
 
 #include "debug.h"
 
-int mapper_clock(struct mapper *mapper, SDL_Surface *s);
+static void ic_rp2a03_sdl_audio_callback(void *userdata, uint8_t *stream, int len);
+
+static int32_t const palette_table[128] = {
+    0xff7c7c7c, 0xff0000fc, 0xff0000bc, 0xff4428bc, 0xff940084, 0xffa80020, 0xffa81000, 0xff881400, 0xff503000, 0xff007800, 0xff006800, 0xff005800, 0xff004058, 0xff000000, 0xff000000, 0xff000000,
+    0xffbcbcbc, 0xff0078f8, 0xff0058f8, 0xff6844fc, 0xffd800cc, 0xffe40058, 0xfff83800, 0xffe45c10, 0xffac7c00, 0xff00b800, 0xff00a800, 0xff00a844, 0xff008888, 0xff000000, 0xff000000, 0xff000000,
+    0xfff8f8f8, 0xff3cbcfc, 0xff6888fc, 0xff9878f8, 0xfff878f8, 0xfff85898, 0xfff87858, 0xfffca044, 0xfff8b800, 0xffb8f818, 0xff58d854, 0xff58f898, 0xff00e8d8, 0xff787878, 0xff000000, 0xff000000,
+    0xfffcfcfc, 0xffa4e4fc, 0xffb8b8f8, 0xffd8b8f8, 0xfff8b8f8, 0xfff8a4c0, 0xfff0d0b0, 0xfffce0a8, 0xfff8d878, 0xffd8f878, 0xffb8f8b8, 0xffb8f8d8, 0xff00fcfc, 0xfff8d8f8, 0xff000000, 0xff000000,
+};
 
 int main(int argc, char *argv[])
 {
@@ -65,7 +72,7 @@ int main(int argc, char *argv[])
         .freq = 44100,
         .format = AUDIO_F32,
         .channels = 1,
-        .samples = 1024,
+        .samples = 256,
         .callback = ic_rp2a03_sdl_audio_callback,
         .userdata = &apu,
     };
@@ -95,29 +102,42 @@ int main(int argc, char *argv[])
     ic_6502_reset(&cpu);
 
     uint32_t ticks[10] = {0};
-    uint32_t counter = 10;
+    uint32_t counter = 0;
     uint32_t prev_ticks = 0;
     //int max_cycles = 1000000;
     while (1) {
-        int render = mapper_clock(mapper, s);
+        int render = mapper_clock(mapper);
 
         if (render) {
-            SDL_UpdateWindowSurface(w);
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
                 controllers_handle(&controllers, &event);
             }
-            SDL_FillRect( s, NULL, SDL_MapRGB( s->format, 0x00, 0x00, 0x00 ) );
 
-            debug_draw(mapper, s);
-
-            uint32_t total_ticks = 0;
+            // Calculate FPS
+            uint32_t total_ticks = 1; // Avoid division by 0
             for (int i = 0; i < 10; i++) {
                 total_ticks += ticks[i];
             }
             uint32_t nticks = SDL_GetTicks();
             ticks[counter] = nticks - prev_ticks;
             prev_ticks = nticks;
+
+            if (counter == 0) {
+                counter = 9;
+            } else {
+                counter--;
+            }
+
+            // Render
+            SDL_FillRect(s, NULL, SDL_MapRGB(s->format, 0x00, 0x00, 0x00));
+
+            for (int i = 0; i < 240; i++) {
+                for (int j = 0; j < 256; j++) {
+                    ((uint32_t *)s->pixels)[(i * s->w + j)] = palette_table[ppu.screen[i][j]];
+                }
+            }
+
             char fps_string[10];
             sprintf(fps_string, "%4.0f FPS", 1000.0f / (total_ticks / 10.0f));
 
@@ -126,11 +146,33 @@ int main(int argc, char *argv[])
             SDL_BlitSurface(textSurface, NULL, s, &textLocation);
             SDL_FreeSurface(textSurface);
 
-            if (counter-- == 0) {
-                counter = 9;
-            }
+            debug_draw(mapper, s);
+
+            SDL_UpdateWindowSurface(w);
         }
     }
 
     return 0;
+}
+
+static void ic_rp2a03_sdl_audio_callback(void *userdata, uint8_t *stream_raw, int len)
+{
+    struct ic_rp2a03 *apu = userdata;
+    int flen = len / sizeof(float);
+    float *stream = (float *)stream_raw;
+
+    int length = apu->buffer_tail - apu->buffer_head;
+    if (length < 0) length += 2048;
+    if (length < flen) {
+        printf("EMPTY\n");
+        for (int i = 0; i < flen; i++) {
+            stream[i] = 0.0f;
+        }
+        return;
+    }
+
+    for (int i = 0; i < flen; i++) {
+        stream[i] = apu->buffer[apu->buffer_head];
+        apu->buffer_head = (apu->buffer_head + 1) % 2048;
+    }
 }

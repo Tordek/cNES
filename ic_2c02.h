@@ -72,9 +72,10 @@ struct ic_2C02_registers {
     uint8_t palette[0x20];
 
     struct mapper *mapper;
+    uint8_t screen[240][256];
 };
 
-int ic_2C02_clock(struct ic_2C02_registers *ppu, SDL_Surface *surface);
+int ic_2C02_clock(struct ic_2C02_registers *ppu);
 uint8_t ic_2c02_read(struct ic_2C02_registers *device, uint16_t address);
 void ic_2c02_write(struct ic_2C02_registers *device, uint16_t address, uint8_t value);
 void ic_2c02_reset(struct ic_2C02_registers *ppu);

@@ -77,10 +77,9 @@ void ic_6502_clock(struct ic_6502_registers * restrict registers)
         // Handle addressing mode
         switch (opcode) {
             case 0x00: case 0x08: case 0x18: case 0x1a: case 0x28: case 0x38: case 0x3a: case 0x40:
-            case 0x48: case 0x58: case 0x5a: case 0x60: case 0x68: case 0x78: case 0x7a: case 0x82:
-            case 0x88: case 0x89: case 0x8a: case 0x98: case 0x9a: case 0xa8: case 0xaa: case 0xb8:
-            case 0xba: case 0xc2: case 0xc8: case 0xca: case 0xd8: case 0xda: case 0xe2: case 0xe8:
-            case 0xea: case 0xf8: case 0xfa:
+            case 0x48: case 0x58: case 0x5a: case 0x60: case 0x68: case 0x78: case 0x7a: case 0x88:
+            case 0x8a: case 0x98: case 0x9a: case 0xa8: case 0xaa: case 0xb8: case 0xba: case 0xc8:
+            case 0xca: case 0xd8: case 0xda: case 0xe8: case 0xea: case 0xf8: case 0xfa:
                 // IMP
                 break;
 
@@ -90,8 +89,9 @@ void ic_6502_clock(struct ic_6502_registers * restrict registers)
 
             case 0x02: case 0x09: case 0x0b: case 0x12: case 0x22: case 0x29: case 0x2b: case 0x32:
             case 0x42: case 0x49: case 0x4b: case 0x52: case 0x62: case 0x69: case 0x6b: case 0x72:
-            case 0x80: case 0x8b: case 0x92: case 0xa0: case 0xa2: case 0xa9: case 0xab: case 0xb2:
-            case 0xc0: case 0xc9: case 0xcb: case 0xd2: case 0xe0: case 0xe9: case 0xeb: case 0xf2:
+            case 0x80: case 0x82: case 0x89: case 0x8b: case 0x92: case 0xa0: case 0xa2: case 0xa9:
+            case 0xab: case 0xb2: case 0xc0: case 0xc2: case 0xc9: case 0xcb: case 0xd2: case 0xe0:
+            case 0xe2: case 0xe9: case 0xeb: case 0xf2:
                 // IMM
                 addr_abs = registers->program_counter;
                 registers->program_counter++;
@@ -231,14 +231,13 @@ void ic_6502_clock(struct ic_6502_registers * restrict registers)
                 // BRK
                 registers->program_counter++;
 
-                registers->status |= ic_6502_I;
                 registers->mapper->cpu_bus_write(registers->mapper, STACK_BASE + registers->stack_pointer, registers->program_counter >> 8);
                 registers->stack_pointer--;
                 registers->mapper->cpu_bus_write(registers->mapper, STACK_BASE + registers->stack_pointer, registers->program_counter & 0xFF);
                 registers->stack_pointer--;
                 registers->mapper->cpu_bus_write(registers->mapper, STACK_BASE + registers->stack_pointer, registers->status | ic_6502_B);
                 registers->stack_pointer--;
-                registers->status &= ~ic_6502_B;
+                registers->status |= ic_6502_I;
 
                 uint8_t lo = registers->mapper->cpu_bus_read(registers->mapper, IRQ_VECTOR);
                 uint8_t hi = registers->mapper->cpu_bus_read(registers->mapper, IRQ_VECTOR + 1);
@@ -330,6 +329,7 @@ void ic_6502_clock(struct ic_6502_registers * restrict registers)
                 registers->a &= fetched;
                 update_flag(registers, ic_6502_Z, registers->a == 0);
                 update_flag(registers, ic_6502_N, registers->a & 0x80);
+                update_flag(registers, ic_6502_C, registers->a & 0x80);
                 break;
 
             case 0x10:
@@ -843,7 +843,7 @@ void ic_6502_clock(struct ic_6502_registers * restrict registers)
                 registers->mapper->cpu_bus_write(registers->mapper, addr_abs, temp);
 
                 temp = registers->a - temp;
-                update_flag(registers, ic_6502_C, registers->a > fetched);
+                update_flag(registers, ic_6502_C, registers->a >= temp);
                 update_flag(registers, ic_6502_Z, temp == 0);
                 update_flag(registers, ic_6502_N, temp & 0x80);
             }

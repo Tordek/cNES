@@ -108,9 +108,9 @@ struct mapper *mapper_0_builder(struct nes_rom *rom)
     return (struct mapper *)mapper;
 }
 
-int mapper_clock(struct mapper *mapper, SDL_Surface *s)
+int mapper_clock(struct mapper *mapper)
 {
-    int render = ic_2C02_clock(mapper->ppu, s);
+    int render = ic_2C02_clock(mapper->ppu);
     if (render && mapper->ppu->do_nmi) {
         ic_6502_nmi(mapper->cpu);
     }
@@ -118,7 +118,6 @@ int mapper_clock(struct mapper *mapper, SDL_Surface *s)
     if (mapper->clock == 0) {
         mapper->clock = 2;
 
-        ic_rp2a03_clock(mapper->apu);
         if (mapper->dma_write_time > 512) {
             mapper->dma_write_time--;
         } else if (mapper->dma_write_time > 0) {
@@ -131,6 +130,7 @@ int mapper_clock(struct mapper *mapper, SDL_Surface *s)
         } else {
             ic_6502_clock(mapper->cpu);
         }
+        ic_rp2a03_clock(mapper->apu);
     } else {
         mapper->clock--;
     }
