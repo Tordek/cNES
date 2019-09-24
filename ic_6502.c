@@ -527,7 +527,16 @@ void ic_6502_clock(struct ic_6502_registers * restrict registers)
                 break;
 
             case 0x4b:
+            {
                 // ALR
+                fetched = registers->mapper->cpu_bus_read(registers->mapper, addr_abs);
+                uint8_t temp = registers->a & fetched;
+                update_flag(registers, ic_6502_C, temp & 0x01);
+                temp >>= 1;
+                update_flag(registers, ic_6502_Z, temp == 0);
+                update_flag(registers, ic_6502_N, temp & 0x80);
+                registers->a = temp;
+            }
                 break;
 
             case 0x4c: case 0x6c:
@@ -630,6 +639,13 @@ void ic_6502_clock(struct ic_6502_registers * restrict registers)
 
             case 0x6b:
                 // ARR
+                fetched = registers->mapper->cpu_bus_read(registers->mapper, addr_abs);
+                registers->a = (registers->status & ic_6502_C) << 7 | (registers->a & fetched) >> 1;
+
+                update_flag(registers, ic_6502_C, registers->a & 0x40);
+                update_flag(registers, ic_6502_V, (registers->a & 0x20) << 1 != (registers->a & 0x40));
+                update_flag(registers, ic_6502_Z, registers->a == 0);
+                update_flag(registers, ic_6502_N, registers->a & 0x80);
                 break;
 
             case 0x70:
@@ -873,7 +889,15 @@ void ic_6502_clock(struct ic_6502_registers * restrict registers)
                 break;
 
             case 0xcb:
+            {
                 // AXS
+                fetched = registers->mapper->cpu_bus_read(registers->mapper, addr_abs);
+                uint16_t temp = (registers->a & registers->x) ;
+                update_flag(registers, ic_6502_C, temp >= fetched);
+                registers->x = temp - fetched;
+                update_flag(registers, ic_6502_Z, registers->x == 0);
+                update_flag(registers, ic_6502_N, registers->x & 0x80);
+            }
                 break;
 
             case 0xd0:
