@@ -7,6 +7,7 @@ struct ic_rp2a03_pulse_channel {
     uint8_t sweep_negate;
     uint8_t sweep_period;
     uint8_t sweep_enable;
+    int sweep_mute;
     int sweep_reload;
     uint16_t timer;
     uint8_t length;
@@ -22,6 +23,29 @@ struct ic_rp2a03_pulse_channel {
 
 struct ic_rp2a03 {
     struct ic_rp2a03_pulse_channel pulse[2];
+
+    uint8_t triangle_counter_halt;
+    uint8_t triangle_counter_load;
+    uint16_t triangle_timer;
+    uint16_t triangle_time;
+    uint8_t triangle_length;
+    uint8_t triangle_sequence;
+    int triangle_linear_counter;
+    int triangle_counter_reload;
+
+    uint8_t noise_counter_halt_envelope_loop;
+    uint8_t noise_constant_volume;
+    uint8_t noise_volume;
+    uint8_t noise_loop;
+    uint8_t noise_period;
+    uint8_t noise_counter_load;
+
+    uint8_t dmc_irq_enable;
+    uint8_t dmc_loop;
+    uint8_t dmc_frequency;
+    uint8_t dmc_load_counter;
+    uint8_t dmc_sample_address;
+    uint8_t dmc_sample_length;
 
     int frame_counter_mode;
 
