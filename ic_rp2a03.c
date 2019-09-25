@@ -13,7 +13,11 @@ static uint8_t const length_table[] = {
 
 static uint8_t const triangle_sequencer[] = {
     15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,
-     0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15
+     0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
+};
+
+static uint16_t const noise_period[] = {
+    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
 };
 
 static uint8_t duty_pattern[] = { 0x40, 0x60, 0x78, 0x9f };
@@ -61,6 +65,7 @@ void ic_rp2a03_init(struct ic_rp2a03 *apu)
             },
         },
         .triangle_sequence = 0,
+        .noise_lfsr = 1,
 
         .buffer_head = 0,
         .buffer_tail = 0,
@@ -75,6 +80,28 @@ void ic_rp2a03_init(struct ic_rp2a03 *apu)
 
 uint8_t ic_rp2a03_read(struct ic_rp2a03 *apu, uint16_t address)
 {
+    switch (address) {
+        case 0x0015:
+        {
+            uint8_t result = 0;
+            if (apu->pulse[0].length > 0) {
+                result |= 0x01;
+            }
+
+            if (apu->pulse[1].length > 0) {
+                result |= 0x02;
+            }
+
+            if (apu->triangle_length > 0) {
+                result |= 0x04;
+            }
+
+            if (apu->noise_length > 0) {
+                result |= 0x08;
+            }
+        }
+            break;
+    }
     return 0;
 }
 
@@ -101,13 +128,11 @@ void ic_rp2a03_write(struct ic_rp2a03 *apu, uint16_t address, uint8_t data)
         case 0x0003: case 0x0007:
             apu->pulse[address >> 2].timer &= 0x00ff;
             apu->pulse[address >> 2].timer |= (data & 0x07) << 8;
-            apu->pulse[address >> 2].time = 0;
             apu->pulse[address >> 2].length = length_table[data >> 3];
+
             apu->pulse[address >> 2].duty_counter = 0;
             apu->pulse[address >> 2].envelope_start = 1;
             apu->pulse[address >> 2].sweep_mute = 0;
-            printf("pulse timer %d\n", apu->pulse[address >> 2].timer);
-            printf("pulse length %d\n", apu->pulse[address >> 2].length);
             break;
         case 0x0008:
             apu->triangle_counter_halt = data >> 7;
@@ -136,11 +161,13 @@ void ic_rp2a03_write(struct ic_rp2a03 *apu, uint16_t address, uint8_t data)
             // Unused
             break;
         case 0x000e:
-            apu->noise_loop = (data & 0x80) >> 7;
-            apu->noise_period = data & 0x0f;
+            apu->noise_mode = (data & 0x80) >> 7;
+            apu->noise_timer = noise_period[data & 0x0f];
             break;
         case 0x000f:
             apu->noise_counter_load = data >> 3;
+            apu->noise_length = apu->noise_counter_load;
+            apu->noise_envelope_start = 1;
             break;
 
         case 0x0010:
@@ -158,8 +185,29 @@ void ic_rp2a03_write(struct ic_rp2a03 *apu, uint16_t address, uint8_t data)
             apu->dmc_sample_length = data;
             break;
         case 0x0015:
+            if ((data & 0x08) == 0) {
+                apu->noise_value = 0;
+                apu->noise_length = 0;
+            }
+
+            if ((data & 0x04) == 0) {
+                apu->triangle_value = 0;
+                apu->triangle_length = 0;
+            }
+
+            if ((data & 0x02) == 0) {
+                apu->pulse[1].value = 0;
+                apu->pulse[1].length = 0;
+            }
+
+            if ((data & 0x01) == 0) {
+                apu->pulse[0].value = 0;
+                apu->pulse[0].length = 0;
+            }
+
             break;
         case 0x0017:
+            apu->frame_counter_mode = data >> 7;
             break;
     }
 }
@@ -174,17 +222,28 @@ void ic_rp2a03_clock(struct ic_rp2a03 *apu)
                 apu->pulse[i].time = apu->pulse[i].timer;
                 apu->pulse[i].duty_counter = (apu->pulse[i].duty_counter + 1) % 8;
 
-                if (apu->pulse[i].length > 0) {
-                    if (!apu->pulse[i].sweep_mute && apu->pulse[i].duty & (1 << apu->pulse[i].duty_counter)) {
-                        apu->pulse[i].value = apu->pulse[i].constant_volume ? apu->pulse[i].volume : apu->pulse[i].envelope_decay_counter;
-                    } else {
-                        apu->pulse[i].value = 0;
-                    }
+                if ((apu->pulse[i].duty & (1 << apu->pulse[i].duty_counter)) == 0
+                        || apu->pulse[i].sweep_mute
+                        || apu->pulse[i].length == 0
+                        || apu->pulse[i].timer < 8) {
+                    apu->pulse[i].value = 0;
+                } else {
+                    apu->pulse[i].value = apu->pulse[i].constant_volume ? apu->pulse[i].volume : apu->pulse[i].envelope_decay_counter;
                 }
             } else {
                 apu->pulse[i].time--;
             }
         }
+
+        uint16_t feedback_bit = apu->noise_lfsr >> (apu->noise_mode ? 6 : 1) & 0x0001;
+        feedback_bit ^= apu->noise_lfsr & 0x0001;
+        apu->noise_lfsr = feedback_bit << 14 | apu->noise_lfsr >> 1;
+        if (apu->noise_length == 0 || (apu->noise_lfsr & 0x0001)) {
+            apu->noise_value = 0;
+        } else {
+            apu->noise_value = apu->noise_constant_volume ? apu->noise_volume : apu->noise_envelope_decay_counter;
+        }
+
     } else {
         apu->divider--;
     }
@@ -193,6 +252,7 @@ void ic_rp2a03_clock(struct ic_rp2a03 *apu)
         apu->triangle_time = apu->triangle_timer;
         if (apu->triangle_linear_counter > 0 && apu->triangle_length > 0) {
             apu->triangle_sequence = (apu->triangle_sequence + 1) % 32;
+            apu->triangle_value = triangle_sequencer[apu->triangle_sequence];
         }
     } else {
         apu->triangle_time--;
@@ -203,7 +263,7 @@ void ic_rp2a03_clock(struct ic_rp2a03 *apu)
 
         // Skip frame 5 in mode 0
         if (apu->frame_counter_mode == 0 && apu->frame_counter == 4) {
-            apu->frame_counter_mode = 3;
+            apu->frame_counter = 3;
         }
 
         // Every frame count
@@ -234,6 +294,24 @@ void ic_rp2a03_clock(struct ic_rp2a03 *apu)
             }
         }
 
+        if (apu->noise_envelope_start) {
+            apu->noise_envelope_start = 0;
+            apu->noise_envelope_decay_counter = 15;
+            apu->noise_envelope_divider = apu->noise_volume;
+        } else {
+            if (apu->noise_envelope_divider == 0) {
+                apu->noise_envelope_divider = apu->noise_volume;
+                if (apu->noise_envelope_decay_counter == 0) {
+                    if (apu->noise_counter_halt_envelope_loop) {
+                        apu->noise_envelope_decay_counter = 15;
+                    }
+                } else {
+                    apu->noise_envelope_decay_counter--;
+                }
+            } else {
+                apu->noise_envelope_divider--;
+            }
+        }
 
         // Every other frame count
         if (apu->frame_counter % 2 == 1) {
@@ -250,20 +328,18 @@ void ic_rp2a03_clock(struct ic_rp2a03 *apu)
 
                 uint16_t target_period = apu->pulse[i].timer + change_amount;
 
-                if (apu->pulse[i].timer < 8 || target_period > 0x07ff) {
+                if (target_period > 0x07ff) {
                     apu->pulse[i].sweep_mute = 1;
                 }
 
-                if (apu->pulse[i].sweep_counter == 0 && apu->pulse[i].sweep_enable) {
+                if (apu->pulse[i].sweep_counter == 0 && apu->pulse[i].sweep_enable && !apu->pulse[i].sweep_mute) {
                     apu->pulse[i].timer = target_period;
                 }
 
                 if (apu->pulse[i].sweep_counter == 0 || apu->pulse[i].sweep_reload) {
                     apu->pulse[i].sweep_reload = 0;
                     apu->pulse[i].sweep_counter = apu->pulse[i].sweep_period;
-                }
-
-                if (apu->pulse[i].sweep_counter > 0) {
+                } else {
                     apu->pulse[i].sweep_counter--;
                 }
             }
@@ -274,6 +350,10 @@ void ic_rp2a03_clock(struct ic_rp2a03 *apu)
 
             if (apu->triangle_length > 0 && !apu->triangle_counter_halt) {
                 apu->triangle_length--;
+            }
+
+            if (apu->noise_length > 0) {
+                apu->noise_length--;
             }
         }
 
@@ -293,7 +373,7 @@ void ic_rp2a03_clock(struct ic_rp2a03 *apu)
         apu->clocks -= 1789773.0f / apu->sampling;
         uint8_t pulse_group = apu->pulse[0].value + apu->pulse[1].value;
         float pulse_out = pulse_group == 0 ? 0 : 95.88 / (8128.0 / pulse_group + 100);
-        float tnd_group = triangle_sequencer[apu->triangle_sequence] / 8227.0 + 0 + 0;
+        float tnd_group = apu->triangle_value / 8227.0 + (apu->noise_value / 12241.0) + 0;
         float tnd_out = tnd_group == 0 ? 0 : 159.79 / (1 / tnd_group + 100);
         apu->buffer[apu->buffer_tail] = pulse_out + tnd_out;
         apu->buffer_tail = (apu->buffer_tail + 1) % 2048;

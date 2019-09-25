@@ -29,6 +29,7 @@ struct ic_rp2a03 {
     uint16_t triangle_timer;
     uint16_t triangle_time;
     uint8_t triangle_length;
+    uint8_t triangle_value;
     uint8_t triangle_sequence;
     int triangle_linear_counter;
     int triangle_counter_reload;
@@ -36,9 +37,16 @@ struct ic_rp2a03 {
     uint8_t noise_counter_halt_envelope_loop;
     uint8_t noise_constant_volume;
     uint8_t noise_volume;
-    uint8_t noise_loop;
-    uint8_t noise_period;
+    uint8_t noise_mode;
+    uint8_t noise_timer;
+    uint8_t noise_time;
     uint8_t noise_counter_load;
+    uint8_t noise_length;
+    int noise_envelope_start;
+    uint16_t noise_lfsr;
+    uint8_t noise_value;
+    uint8_t noise_envelope_divider;
+    uint8_t noise_envelope_decay_counter;
 
     uint8_t dmc_irq_enable;
     uint8_t dmc_loop;
