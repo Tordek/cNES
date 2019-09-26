@@ -214,13 +214,16 @@ void debug_draw(struct mapper *mapper, SDL_Surface *surface)
         pulse_0[i] = pulse_0[i+1];
         pulse_1[i] = pulse_1[i+1];
         triangle[i] = triangle[i+1];
-        noise[i] = triangle[i+1];
+        noise[i] = noise[i+1];
     }
 
-    pulse_0[AUDIO_SAMPLES - 1] = mapper->apu->pulse[0].constant_volume ? mapper->apu->pulse[0].volume : mapper->apu->pulse[0].envelope_decay_counter;
-    pulse_1[AUDIO_SAMPLES - 1] = mapper->apu->pulse[1].constant_volume ? mapper->apu->pulse[1].volume : mapper->apu->pulse[1].envelope_decay_counter;
+    pulse_0[AUDIO_SAMPLES - 1] = mapper->apu->pulse[0].length == 0 ? 0 :
+                                 mapper->apu->pulse[0].constant_volume ? mapper->apu->pulse[0].volume : mapper->apu->pulse[0].envelope_decay_counter;
+    pulse_1[AUDIO_SAMPLES - 1] = mapper->apu->pulse[1].length == 0 ? 0 :
+                                 mapper->apu->pulse[1].constant_volume ? mapper->apu->pulse[1].volume : mapper->apu->pulse[1].envelope_decay_counter;
     triangle[AUDIO_SAMPLES - 1] = mapper->apu->triangle_length > 0 && mapper->apu->triangle_linear_counter > 0 ? 15 : 0;
-    noise[AUDIO_SAMPLES - 1] = mapper->apu->noise_value = mapper->apu->noise_constant_volume ? mapper->apu->noise_volume : mapper->apu->noise_envelope_decay_counter;
+    noise[AUDIO_SAMPLES - 1] = mapper->apu->noise_length == 0 ? 0 :
+                               mapper->apu->noise_constant_volume ? mapper->apu->noise_volume : mapper->apu->noise_envelope_decay_counter;
 
     for (int i = 0; i < AUDIO_SAMPLES; i++) {
         int p_x;
