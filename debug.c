@@ -10,6 +10,12 @@
 
 #include "debug.h"
 
+#define AUDIO_SAMPLES 100
+
+static uint8_t pulse_0[AUDIO_SAMPLES] = {0};
+static uint8_t pulse_1[AUDIO_SAMPLES] = {0};
+static uint8_t triangle[AUDIO_SAMPLES] = {0};
+static uint8_t noise[AUDIO_SAMPLES] = {0};
 
 static int32_t const palette_table[128] = {
     0xff7c7c7c, 0xff0000fc, 0xff0000bc, 0xff4428bc, 0xff940084, 0xffa80020, 0xffa81000, 0xff881400, 0xff503000, 0xff007800, 0xff006800, 0xff005800, 0xff004058, 0xff000000, 0xff000000, 0xff000000,
@@ -193,6 +199,52 @@ void debug_draw(struct mapper *mapper, SDL_Surface *surface)
             }
         }
     }
+
+    textLocation = (SDL_Rect){ .x = 2, .y = 300, .w = 0, .h = 0, };
+    textSurface = TTF_RenderText_Solid(
+        font,
+        "Audio channels",
+        fg
+    );
+
+    SDL_BlitSurface(textSurface, NULL, surface, &textLocation);
+    SDL_FreeSurface(textSurface);
+
+    for (int i = 0; i < AUDIO_SAMPLES - 1; i++) {
+        pulse_0[i] = pulse_0[i+1];
+        pulse_1[i] = pulse_1[i+1];
+        triangle[i] = triangle[i+1];
+        noise[i] = triangle[i+1];
+    }
+
+    pulse_0[AUDIO_SAMPLES - 1] = mapper->apu->pulse[0].constant_volume ? mapper->apu->pulse[0].volume : mapper->apu->pulse[0].envelope_decay_counter;
+    pulse_1[AUDIO_SAMPLES - 1] = mapper->apu->pulse[1].constant_volume ? mapper->apu->pulse[1].volume : mapper->apu->pulse[1].envelope_decay_counter;
+    triangle[AUDIO_SAMPLES - 1] = mapper->apu->triangle_length > 0 && mapper->apu->triangle_linear_counter > 0 ? 15 : 0;
+    noise[AUDIO_SAMPLES - 1] = mapper->apu->noise_value = mapper->apu->noise_constant_volume ? mapper->apu->noise_volume : mapper->apu->noise_envelope_decay_counter;
+
+    for (int i = 0; i < AUDIO_SAMPLES; i++) {
+        int p_x;
+        int p_y;
+
+        p_x = i + 4;
+        p_y = 350 - pulse_0[i] * 2;
+        ((uint32_t *)surface->pixels)[(p_y * surface->w + p_x)] = 0xFFFFFFFF;
+
+        p_x = i + 4;
+        p_y = 420 - pulse_1[i] * 2;
+        ((uint32_t *)surface->pixels)[(p_y * surface->w + p_x)] = 0xFFFFFFFF;
+
+        p_x = i + 4;
+        p_y = 490 - triangle[i] * 2;
+        ((uint32_t *)surface->pixels)[(p_y * surface->w + p_x)] = 0xFFFFFFFF;
+
+        p_x = i + 4;
+        p_y = 560 - noise[i] * 2;
+        ((uint32_t *)surface->pixels)[(p_y * surface->w + p_x)] = 0xFFFFFFFF;
+
+    }
+
+    // OAM
 
     TTF_CloseFont(font);
 }
