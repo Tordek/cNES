@@ -58,6 +58,8 @@ int read_rom(struct nes_rom *rom, char *filename)
     if (rom->chr_rom_size > 0) {
         rom->chr_rom = malloc(0x2000 * rom->chr_rom_size);
         fread(rom->chr_rom, 0x2000, rom->chr_rom_size, rom_file);
+    } else {
+        rom->chr_rom = malloc(0x20000);
     }
 
     fclose(rom_file);

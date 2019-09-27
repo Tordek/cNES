@@ -1,3 +1,19 @@
+#include <stdint.h>
+#include <stdlib.h>
+
+#include "SDL2/SDL.h"
+
+#include "nes_header.h"
+#include "mapper.h"
+#include "mappers.h"
+
+#include "controllers.h"
+#include "ic_rp2a03.h"
+#include "ic_6502.h"
+#include "ic_2c02.h"
+
+#include "mapper0.h"
+
 struct mapper_0 {
     struct mapper base;
     uint8_t main_ram[0x0800];

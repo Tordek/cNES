@@ -12,8 +12,8 @@
 #include "ic_6502.h"
 #include "ic_2c02.h"
 
-#include "mapper0.c"
-// #include "mapper1.c"
+#include "mapper0.h"
+#include "mapper1.h"
 
 int mapper_clock(struct mapper *mapper)
 {
@@ -47,5 +47,5 @@ int mapper_clock(struct mapper *mapper)
 
 struct mapper *(*mappers[])(struct nes_rom *rom) = {
     mapper_0_builder,
-    //mapper_1_builder,
+    mapper_1_builder,
 };

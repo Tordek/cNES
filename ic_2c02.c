@@ -411,9 +411,11 @@ void ic_2c02_write(struct ic_2C02_registers *device, uint16_t address, uint8_t v
                 ppu->mapper->ppu_bus_write(ppu->mapper, ppu->vram_address & 0x3FFF, value);
             } else {
                 uint8_t palette_pos = ppu->vram_address & 0x1f;
-                ppu->palette[palette_pos] = value;
                 if ((palette_pos & 0x03) == 0) {
                     ppu->palette[palette_pos & 0x0F] = value;
+                    ppu->palette[palette_pos | 0x10] = value;
+                } else {
+                    ppu->palette[palette_pos] = value;
                 }
             }
 
