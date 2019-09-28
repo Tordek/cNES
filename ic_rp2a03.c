@@ -99,6 +99,7 @@ uint8_t ic_rp2a03_read(struct ic_rp2a03 *apu, uint16_t address)
             if (apu->noise_length > 0) {
                 result |= 0x08;
             }
+            return result;
         }
             break;
     }
