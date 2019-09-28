@@ -23,7 +23,7 @@ struct mapper_0 {
     uint16_t nametable_mirroring;
     uint16_t prg_rom_mirroring;
     uint8_t const *prg_rom;
-    uint8_t const *chr_rom;
+    uint8_t *chr_rom;
 };
 
 uint8_t mapper_0_cpu_bus_read(struct mapper *mapper_, uint16_t address)
@@ -83,7 +83,7 @@ void mapper_0_ppu_bus_write(struct mapper *mapper_, uint16_t address, uint8_t da
     struct mapper_0 *mapper = (struct mapper_0 *)mapper_;
 
     if (address < 0x2000) {
-        // chr_rom is not writable; ignore.
+        mapper->chr_rom[address] = data;
     } else {
         mapper->vram[address & mapper->nametable_mirroring] = data;
     }
