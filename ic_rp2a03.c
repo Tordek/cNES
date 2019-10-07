@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
-#include "SDL2/SDL.h"
 #include "ic_rp2a03.h"
 
 #define FREQ 48000.0
@@ -67,12 +66,6 @@ void ic_rp2a03_init(struct ic_rp2a03 *apu)
         .triangle_sequence = 0,
         .noise_lfsr = 1,
 
-        .buffer_head = 0,
-        .buffer_tail = 0,
-        .buffer_max = 0,
-        .clocks = 0,
-
-        .sampling = 0,
         .divider = 0,
         .frame_divider = 0,
     };
@@ -213,7 +206,7 @@ void ic_rp2a03_write(struct ic_rp2a03 *apu, uint16_t address, uint8_t data)
     }
 }
 
-void ic_rp2a03_clock(struct ic_rp2a03 *apu)
+float ic_rp2a03_clock(struct ic_rp2a03 *apu)
 {
     if (apu->divider == 0) {
         apu->divider = 1;
@@ -367,16 +360,9 @@ void ic_rp2a03_clock(struct ic_rp2a03 *apu)
         apu->frame_divider--;
     }
 
-    apu->clocks++;
-    while (apu->clocks >= 0) {
-        while ((apu->buffer_tail + 1) % 2048 == apu->buffer_head);
-
-        apu->clocks -= 1789773.0f / apu->sampling;
-        uint8_t pulse_group = apu->pulse[0].value + apu->pulse[1].value;
-        float pulse_out = pulse_group == 0 ? 0 : 95.88 / (8128.0 / pulse_group + 100);
-        float tnd_group = apu->triangle_value / 8227.0 + (apu->noise_value / 12241.0) + 0;
-        float tnd_out = tnd_group == 0 ? 0 : 159.79 / (1 / tnd_group + 100);
-        apu->buffer[apu->buffer_tail] = pulse_out + tnd_out;
-        apu->buffer_tail = (apu->buffer_tail + 1) % 2048;
-    }
+    uint8_t pulse_group = apu->pulse[0].value + apu->pulse[1].value;
+    float pulse_out = pulse_group == 0 ? 0 : 95.88 / (8128.0 / pulse_group + 100);
+    float tnd_group = apu->triangle_value / 8227.0 + (apu->noise_value / 12241.0) + 0;
+    float tnd_out = tnd_group == 0 ? 0 : 159.79 / (1 / tnd_group + 100);
+    return pulse_out + tnd_out;
 }

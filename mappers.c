@@ -37,7 +37,17 @@ int mapper_clock(struct mapper *mapper)
         } else {
             ic_6502_clock(mapper->cpu);
         }
-        ic_rp2a03_clock(mapper->apu);
+
+        float sample = ic_rp2a03_clock(mapper->apu);
+
+        mapper->clocks++;
+        while (mapper->clocks >= 0) {
+            mapper->clocks -= 1789773.0f / mapper->sampling;
+
+            while ((mapper->buffer_tail + 1) % 2048 == mapper->buffer_head);
+            mapper->buffer[mapper->buffer_tail] = sample;
+            mapper->buffer_tail = (mapper->buffer_tail + 1) % 2048;
+        }
     } else {
         mapper->clock--;
     }

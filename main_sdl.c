@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
         .channels = 1,
         .samples = 256,
         .callback = ic_rp2a03_sdl_audio_callback,
-        .userdata = &apu,
+        .userdata = mapper,
     };
 
     SDL_AudioSpec obtained;
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
         SDL_Log("Failed to open audio: %s", SDL_GetError());
     }
 
-    apu.sampling = obtained.freq;
+    mapper->sampling = obtained.freq;
     SDL_PauseAudioDevice(audio, 0);
 
     SDL_Surface *s = SDL_GetWindowSurface(w);
@@ -157,11 +157,11 @@ int main(int argc, char *argv[])
 
 static void ic_rp2a03_sdl_audio_callback(void *userdata, uint8_t *stream_raw, int len)
 {
-    struct ic_rp2a03 *apu = userdata;
+    struct mapper *mapper = userdata;
     int flen = len / sizeof(float);
     float *stream = (float *)stream_raw;
 
-    int length = apu->buffer_tail - apu->buffer_head;
+    int length = mapper->buffer_tail - mapper->buffer_head;
     if (length < 0) length += 2048;
     if (length < flen) {
         printf("EMPTY\n");
@@ -172,7 +172,7 @@ static void ic_rp2a03_sdl_audio_callback(void *userdata, uint8_t *stream_raw, in
     }
 
     for (int i = 0; i < flen; i++) {
-        stream[i] = apu->buffer[apu->buffer_head];
-        apu->buffer_head = (apu->buffer_head + 1) % 2048;
+        stream[i] = mapper->buffer[mapper->buffer_head];
+        mapper->buffer_head = (mapper->buffer_head + 1) % 2048;
     }
 }

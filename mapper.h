@@ -11,6 +11,13 @@ struct mapper {
 
     int16_t dma_page;
     int16_t dma_write_time;
+
+    float buffer[4096];
+    volatile int buffer_head;
+    volatile int buffer_tail;
+    int buffer_max;
+    float clocks;
+    float sampling;
 };
 
 int mapper_clock(struct mapper *mapper);
