@@ -83,7 +83,7 @@ int ic_2C02_clock(struct ic_2C02_registers *ppu)
     int pixel = ppu->pixel;
     if (ppu->mask & 0x18) {
         if (-1 < scanline && scanline < 240 && 0 < pixel && pixel < 257) {
-            int8_t color_abs;
+            int8_t color_abs = 0;
 
             if (ppu->mask & 0x08) { // BG
                 uint8_t color_id = ((ppu->pattern_lo << ppu->fine_x) & 0x8000) >> 15;
@@ -207,6 +207,12 @@ int ic_2C02_clock(struct ic_2C02_registers *ppu)
             if (ppu->scanline == -1 && 280 <= ppu->pixel && ppu->pixel <= 304) {
                 ppu->vram_address &= 0x041f;
                 ppu->vram_address |= ppu->t & 0xfbe0;
+            }
+        }
+    } else {
+        if (-1 < scanline && scanline < 240 && 0 < pixel && pixel < 257) {
+            if (ppu->vram_address >= 0x3f00) {
+                ppu->screen[scanline][pixel - 1] = ppu->palette[ppu->vram_address & 0x001F];
             }
         }
     }
