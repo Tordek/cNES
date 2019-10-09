@@ -1034,3 +1034,28 @@ void ic_6502_nmi(struct ic_6502_registers * restrict registers)
     registers->program_counter = hi << 8 | lo;
     registers->cycles = 8;
 }
+
+void ic_6502_irq(struct ic_6502_registers * restrict registers)
+{
+    if (registers->status & ic_6502_I) {
+        return;
+    }
+
+    registers->mapper->cpu_bus_write(registers->mapper, STACK_BASE + registers->stack_pointer, registers->program_counter >> 8);
+    registers->stack_pointer--;
+    registers->mapper->cpu_bus_write(registers->mapper, STACK_BASE + registers->stack_pointer, registers->program_counter & 0xFF);
+    registers->stack_pointer--;
+
+    registers->status &= ~ic_6502_B;
+    registers->status |= ic_6502_U;
+
+    registers->mapper->cpu_bus_write(registers->mapper, STACK_BASE + registers->stack_pointer, registers->status);
+    registers->stack_pointer--;
+
+    registers->status |= ic_6502_I;
+    uint8_t lo = registers->mapper->cpu_bus_read(registers->mapper, IRQ_VECTOR);
+    uint8_t hi = registers->mapper->cpu_bus_read(registers->mapper, IRQ_VECTOR + 1);
+
+    registers->program_counter = hi << 8 | lo;
+    registers->cycles = 8;
+}
